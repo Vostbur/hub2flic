@@ -1,0 +1,7 @@
+github_name: 
+github_token: 
+per_page: 100
+gitflic_name: 
+gitflic_pass: 
+gitflic_token: 
+clone_path: ./tmp
