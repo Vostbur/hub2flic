@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-
 func gistMulti(cfg *Config, gh *GitHub) (count int) {
 	for i, gist := range gh.GistsList() {
 		// TODO: FOR TEST ONLY
@@ -67,14 +66,16 @@ func gistSingle(cfg *Config, gh *GitHub) (count int) {
 		}
 
 		for fname, details := range gst.Files {
-			if err := os.MkdirAll(clonePath, 0755); err != nil {
+			if err := os.MkdirAll(
+				fmt.Sprintf("%s/%s", clonePath, *gst.ID),
+				0755); err != nil {
 				log.Fatalf("\033[31;1m%s\033[0m\n", err)
 			}
-			err := os.WriteFile(
-				fmt.Sprintf("%s/%s_%s", clonePath, *gst.ID, fname),
+
+			if err := os.WriteFile(
+				fmt.Sprintf("%s/%s/%s", clonePath, *gst.ID, fname),
 				[]byte(*details.Content),
-				0644)
-			if err != nil {
+				0644); err != nil {
 				log.Printf("\033[31;1m%s\033[0m\n", err)
 			}
 		}
