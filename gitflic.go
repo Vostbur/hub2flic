@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/google/go-github/github"
+	"github.com/go-git/go-git/v5/config"
 
 	git_http "github.com/go-git/go-git/v5/plumbing/transport/http"
 )
@@ -20,20 +20,22 @@ type Project struct {
 	Language    *string `json:"language"`
 	Private     *bool   `json:"private"`
 	PushURL     *string
+	ClonePath   *string
 }
 
 func String(v string) *string { return &v }
 
 func Bool(v bool) *bool { return &v }
 
-func NewProject(cfg *Config, r *github.Repository) *Project {
+func NewProject(cfg *Config, name string, description string, language string, private bool) *Project {
 	return &Project{
-		Title:       r.Name,
-		Description: r.Description,
-		Alias:       r.Name,
-		Language:    r.Language,
-		Private:     Bool(false),
-		PushURL:     String(fmt.Sprintf("%s/%s/%s.git", GITFLIC_URL, cfg.GitFlicName, *r.Name)),
+		Title:       String(name),
+		Description: String(description),
+		Alias:       String(name),
+		Language:    String(language),
+		Private:     Bool(private),
+		PushURL:     String(fmt.Sprintf("%s/%s/%s.git", GITFLIC_URL, cfg.GitFlicName, name)),
+		ClonePath:   String(cfg.ClonePath),
 	}
 }
 
@@ -111,9 +113,43 @@ func (p *Project) Create(cfg *Config) error {
 	return nil
 }
 
+func (p *Project) InitCommit(pth string) error {
+	path := *p.ClonePath + pth
+
+	r, err := git.PlainInit(path, false)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{*p.PushURL},
+	})
+	if err != nil {
+		return err
+	}
+
+	w, err := r.Worktree()
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Add(".")
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Commit("Added my new file", &git.CommitOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // push to GitFlic
-func (p *Project) Push(cfg *Config, clonePath string) error {
-	r, err := git.PlainOpen(clonePath)
+func (p *Project) Push(cfg *Config, path string) error {
+	r, err := git.PlainOpen(path)
 	if err != nil {
 		return err
 	}

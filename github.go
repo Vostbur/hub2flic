@@ -32,7 +32,8 @@ func (g *GitHub) Set(cfg *Config) {
 }
 
 // list all repositories for the authenticated user
-func (g *GitHub) List() []*github.Repository {
+// TODO return error
+func (g *GitHub) ReposList() []*github.Repository {
 	repos, resp, err := g.Client.Repositories.List(
 		g.Ctx,
 		"",
@@ -52,17 +53,39 @@ func (g *GitHub) List() []*github.Repository {
 	return repos
 }
 
+// list all gists for the authenticated user
+// TODO return error
+func (g *GitHub) GistsList() []*github.Gist {
+	gists, resp, err := g.Client.Gists.List(
+		g.Ctx,
+		"",
+		&github.GistListOptions{ListOptions: g.Lops})
+	if err != nil {
+		log.Fatalf("\033[31;1m%s\033[0m\n", err)
+	}
+
+	if resp.StatusCode != 200 {
+		log.Fatalf("\031[34;1m%s\033[0m\n",
+			fmt.Sprintf("no gists received from GitHub. Status code: %d", resp.StatusCode))
+	}
+
+	log.Printf("\033[34;43;1m%s\033[0m\n",
+		fmt.Sprintf("received %d gists from GitHub", len(gists)))
+
+	return gists
+}
+
 // clone repository from GitHub
-func (g *GitHub) Clone(r *github.Repository) {
-	clonePath := g.ClonePath + *r.Name
+func (g *GitHub) Clone(name *string, url *string) {
+	clonePath := g.ClonePath + *name
 
 	_, err := git.PlainClone(clonePath, false, &git.CloneOptions{
-		URL:      *r.CloneURL,
+		URL:      *url,
 		Progress: nil,
 	})
 	if err != nil {
 		log.Printf("\033[31;1m%s\033[0m\n", err) // normal continuetion if repo exists localy
 	} else {
-		log.Printf("\033[34;1m%s\033[0m\n", fmt.Sprintf("repository '%s' is cloned", *r.FullName))
+		log.Printf("\033[34;1m%s\033[0m\n", fmt.Sprintf("'%s' is cloned", *name))
 	}
 }
