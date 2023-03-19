@@ -56,11 +56,7 @@ func getRepoByName(cfg *Config, gh *GitHub, name string) error {
 }
 
 func reposGH(cfg *Config, gh *GitHub) (count uint) {
-	for i, repo := range gh.ReposList() {
-		// TODO: FOR TEST ONLY
-		if i > 1 {
-			break
-		}
+	for _, repo := range gh.ReposList() {
 		if isSuccess := transferRepo(cfg, gh, repo); isSuccess {
 			count++
 		}
@@ -69,12 +65,7 @@ func reposGH(cfg *Config, gh *GitHub) (count uint) {
 }
 
 func gistMulti(cfg *Config, gh *GitHub) (count uint) {
-	for i, gist := range gh.GistsList() {
-		// TODO: FOR TEST ONLY
-		if i > 1 {
-			break
-		}
-
+	for _, gist := range gh.GistsList() {
 		clonePath := cfg.ClonePath + *gist.ID
 
 		gh.Clone(gist.ID, gist.GitPullURL)
@@ -117,12 +108,7 @@ func gistSingle(cfg *Config, gh *GitHub) (count uint) {
 
 	clonePath := cfg.ClonePath + name
 
-	for i, gist := range gh.GistsList() {
-		// TODO: FOR TEST ONLY
-		if i > 1 {
-			break
-		}
-
+	for _, gist := range gh.GistsList() {
 		gst, _, err := gh.Client.Gists.Get(gh.Ctx, *gist.ID)
 		if err != nil {
 			log.Printf("\033[31;1m%s\033[0m\n", err)

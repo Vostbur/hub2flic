@@ -35,7 +35,7 @@ transfer all repos and all gists each in its own repo
 
     $ ./hub2flic -config conf.yaml -gist yes
 
-transfer all repos and all gists in one repo
+transfer all repos and all gists in one repo `gists.git`
 
     $ ./hub2flic -config conf.yaml -gist single
 
