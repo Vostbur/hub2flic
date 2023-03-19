@@ -31,6 +31,21 @@ func (g *GitHub) Set(cfg *Config) {
 	g.ClonePath = cfg.ClonePath
 }
 
+// return GitHub repository by name
+func (g *GitHub) GetRepoByName(owner, name string) (*github.Repository, error) {
+	repo, resp, err := g.Client.Repositories.Get(g.Ctx, owner, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("no repositories received from GitHub. Status code: %d",
+			resp.StatusCode)
+	}
+
+	return repo, nil
+}
+
 // list all repositories for the authenticated user
 // TODO return error
 func (g *GitHub) ReposList() []*github.Repository {

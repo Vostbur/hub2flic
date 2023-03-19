@@ -5,9 +5,70 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/google/go-github/github"
 )
 
-func gistMulti(cfg *Config, gh *GitHub) (count int) {
+func transferRepo(cfg *Config, gh *GitHub, repo *github.Repository) bool {
+	clonePath := cfg.ClonePath + *repo.Name
+
+	gh.Clone(repo.Name, repo.CloneURL)
+
+	// GitFlic limits for project name and alias
+	if len(*repo.Name) < 3 {
+		repo.Name = String(fmt.Sprintf("github_%s", *repo.Name))
+	}
+	repo.Name = String(strings.ReplaceAll(*repo.Name, ".", ""))
+
+	gf := NewProject(cfg, *repo.Name, *repo.Description, *repo.Language, *repo.Private)
+
+	if !gf.Exists(cfg) {
+		if err := gf.Create(cfg); err != nil {
+			log.Printf("\033[31;1m%s\033[0m\n", err)
+			cleanUp(clonePath)
+			return false
+		}
+	}
+
+	if err := gf.Push(cfg, clonePath); err != nil {
+		log.Printf("\033[31;1m%s\033[0m\n", err)
+		cleanUp(clonePath)
+		return false
+	}
+
+	cleanUp(clonePath)
+
+	return true
+}
+
+func getRepoByName(cfg *Config, gh *GitHub, name string) error {
+	repo, err := gh.GetRepoByName(cfg.GitHubName, name)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("\033[34;43;1m%s\033[0m\n",
+		fmt.Sprintf("received '%s' repository from GitHub", name))
+
+	transferRepo(cfg, gh, repo)
+
+	return nil
+}
+
+func reposGH(cfg *Config, gh *GitHub) (count uint) {
+	for i, repo := range gh.ReposList() {
+		// TODO: FOR TEST ONLY
+		if i > 1 {
+			break
+		}
+		if isSuccess := transferRepo(cfg, gh, repo); isSuccess {
+			count++
+		}
+	}
+	return
+}
+
+func gistMulti(cfg *Config, gh *GitHub) (count uint) {
 	for i, gist := range gh.GistsList() {
 		// TODO: FOR TEST ONLY
 		if i > 1 {
@@ -18,7 +79,7 @@ func gistMulti(cfg *Config, gh *GitHub) (count int) {
 
 		gh.Clone(gist.ID, gist.GitPullURL)
 
-		gfg := NewProject(cfg, *gist.ID, *gist.Description, "Markdown", false)
+		gfg := NewProject(cfg, *gist.ID, *gist.Description, "Markdown", !*gist.Public)
 
 		if !gfg.Exists(cfg) {
 			if err := gfg.Create(cfg); err != nil {
@@ -41,10 +102,12 @@ func gistMulti(cfg *Config, gh *GitHub) (count int) {
 	return
 }
 
-func gistSingle(cfg *Config, gh *GitHub) (count int) {
+func gistSingle(cfg *Config, gh *GitHub) (count uint) {
 	name := "gists"
 
-	gfg := NewProject(cfg, name, "all GitHub gists in one repository", "Markdown", false)
+	// "single" repo is always Private on GitFlic
+	// to make Public change 'true' to 'false'
+	gfg := NewProject(cfg, name, "all GitHub gists in one repository", "Markdown", true)
 
 	if !gfg.Exists(cfg) {
 		if err := gfg.Create(cfg); err != nil {
@@ -94,46 +157,6 @@ func gistSingle(cfg *Config, gh *GitHub) (count int) {
 	}
 
 	cleanUp(clonePath)
-
-	return
-}
-
-func reposGH(cfg *Config, gh *GitHub) (count int) {
-	for i, repo := range gh.ReposList() {
-		// TODO: FOR TEST ONLY
-		if i > 1 {
-			break
-		}
-
-		clonePath := cfg.ClonePath + *repo.Name
-
-		gh.Clone(repo.Name, repo.CloneURL)
-
-		// GitFlic limits for project name and alias
-		if len(*repo.Name) < 3 {
-			repo.Name = String(fmt.Sprintf("github_%s", *repo.Name))
-		}
-		repo.Name = String(strings.ReplaceAll(*repo.Name, ".", ""))
-
-		gf := NewProject(cfg, *repo.Name, *repo.Description, *repo.Language, false)
-
-		if !gf.Exists(cfg) {
-			if err := gf.Create(cfg); err != nil {
-				log.Printf("\033[31;1m%s\033[0m\n", err)
-				cleanUp(clonePath)
-				continue
-			}
-		}
-
-		if err := gf.Push(cfg, clonePath); err != nil {
-			log.Printf("\033[31;1m%s\033[0m\n", err)
-			cleanUp(clonePath)
-			continue
-		}
-
-		cleanUp(clonePath)
-		count++
-	}
 
 	return
 }

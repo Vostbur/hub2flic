@@ -13,12 +13,12 @@ const (
 	GITFLIC_URL     = "https://gitflic.ru/project"
 )
 
-var configFile, gistOpt string
+var configFile, gistOpt, repoOpt string
 
 func init() {
 	flag.StringVar(&configFile, "config", "", "Path to YAML config file")
-	flag.StringVar(&gistOpt, "gist", "no",
-		"Options for clone gists, may be 'no' (default), 'yes' or 'single'")
+	flag.StringVar(&repoOpt, "repo", "", "Repository name")
+	flag.StringVar(&gistOpt, "gist", "no", "Clone gists: 'no' (or without key), 'yes' or 'single'")
 }
 
 func isFlagSet(name string) bool {
@@ -31,21 +31,30 @@ func isFlagSet(name string) bool {
 	return found
 }
 
+// Configure program options with CLI args
+func setup(cfg *Config) error {
+	if isFlagSet("config") {
+		if err := cfg.Set(configFile); err != nil {
+			return err
+		}
+	} else {
+		return errors.New("config filename is empty. Use with flag -config or -help")
+	}
+	
+	if !isFlagSet("gist") {
+		gistOpt = "no"
+	}
+
+	return nil
+}
+
 func main() {
 	flag.Parse()
 
 	cfg := new(Config)
-	if isFlagSet("config") {
-		if err := cfg.Set(configFile); err != nil {
-			log.Fatalf("\033[31;1m%s\033[0m\n", err)
-		}
-	} else {
-		log.Fatalf("\033[31;1m%s\033[0m\n",
-			errors.New("config filename is empty. Use with flag -config or -help"))
-	}
 
-	if !isFlagSet("gist") {
-		gistOpt = "no"
+	if err := setup(cfg); err != nil {
+		log.Fatalf("\033[31;1m%s\033[0m\n", err)
 	}
 
 	log.Printf("\033[34;43;1m%s\033[0m\n", "configuration set up successfully")
@@ -53,7 +62,16 @@ func main() {
 	gh := new(GitHub)
 	gh.Set(cfg)
 
-	count := reposGH(cfg, gh)
+	var count uint
+	
+	if isFlagSet("repo") {
+		if err := getRepoByName(cfg, gh, repoOpt); err != nil {
+			log.Fatalf("\033[31;1m%s\033[0m\n", err)
+		}
+		count = 1
+	} else {
+		count = reposGH(cfg, gh)
+	}
 
 	log.Printf("\033[34;43;1m%s\033[0m\n",
 		fmt.Sprintf("moved %d repositories from GitHub to GitFlic", count))
