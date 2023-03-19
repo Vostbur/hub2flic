@@ -14,11 +14,23 @@ func transferRepo(cfg *Config, gh *GitHub, repo *github.Repository) bool {
 
 	gh.Clone(repo.Name, repo.CloneURL)
 
+	// TODO: call validation function
 	// GitFlic limits for project name and alias
-	if len(*repo.Name) < 3 {
-		repo.Name = String(fmt.Sprintf("github_%s", *repo.Name))
+	if len(*repo.Name) <= 3 {
+		repo.Name = String(fmt.Sprintf("github-%s", *repo.Name))
 	}
 	repo.Name = String(strings.ReplaceAll(*repo.Name, ".", ""))
+	repo.Name = String(strings.ReplaceAll(*repo.Name, "_", ""))
+	repo.Name = String(strings.ToLower(*repo.Name))
+
+	// TODO: call validation function
+	if repo.Description == nil {
+		repo.Description = String("Description")
+	}
+
+	if repo.Language == nil {
+		repo.Language = String("Markdown")
+	}
 
 	gf := NewProject(cfg, *repo.Name, *repo.Description, *repo.Language, *repo.Private)
 
