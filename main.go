@@ -11,8 +11,12 @@ import (
 const (
 	GITFLIC_API_URL = "https://api.gitflic.ru/project"
 	GITFLIC_URL     = "https://gitflic.ru/project"
+	ERROR           = "\033[31;1m%s\033[0m\n"
+	MESSAGE         = "\033[34;43;1m%s\033[0m\n"
+	INFO            = "\033[34;1m%s\033[0m\n"
 )
 
+// vars for CLI keys
 var configFile, gistOpt, repoOpt string
 
 func init() {
@@ -32,61 +36,122 @@ func isFlagSet(name string) bool {
 }
 
 // Configure program options with CLI args
-func setup(cfg *Config) error {
+func newConfig() (*Config, error) {
+	cfg := new(Config)
+
 	if isFlagSet("config") {
 		if err := cfg.Set(configFile); err != nil {
-			return err
+			return nil, err
 		}
 	} else {
-		return errors.New("config filename is empty. Use with flag -config or -help")
+		return nil, errors.New("config filename is empty. Use with flag -config or -help")
 	}
-	
+
 	if !isFlagSet("gist") {
 		gistOpt = "no"
 	}
 
-	return nil
+	return cfg, nil
 }
 
 func main() {
 	flag.Parse()
 
-	cfg := new(Config)
-
-	if err := setup(cfg); err != nil {
-		log.Fatalf("\033[31;1m%s\033[0m\n", err)
+	cfg, err := newConfig()
+	if err != nil {
+		log.Fatalf(ERROR, err)
 	}
 
-	log.Printf("\033[34;43;1m%s\033[0m\n", "configuration set up successfully")
+	log.Printf(MESSAGE, "configuration set up successfully")
 
-	gh := new(GitHub)
-	gh.Set(cfg)
+	gh := newGitHub(cfg)
+	var countRepo, countGist uint
 
-	var count uint
-	
 	if isFlagSet("repo") {
-		if err := getRepoByName(cfg, gh, repoOpt); err != nil {
-			log.Fatalf("\033[31;1m%s\033[0m\n", err)
+
+		repo, err := gh.GetRepoByName(cfg.GitHubName, repoOpt)
+		if err != nil {
+			log.Fatalf(ERROR, err)
 		}
-		count = 1
+
+		log.Printf(MESSAGE, fmt.Sprintf("received '%s' repository from GitHub", *repo.Name))
+
+		validateRepo(repo)
+
+		if isSuccess := transferRepo(
+			cfg,
+			gh,
+			*repo.Name,
+			*repo.CloneURL,
+			*repo.Description,
+			*repo.Language,
+			*repo.Private); isSuccess {
+
+			countRepo++
+		}
+
 	} else {
-		count = reposGH(cfg, gh)
+
+		repos, err := gh.ReposList()
+		if err != nil {
+			log.Fatalf(ERROR, err)
+		}
+
+		log.Printf(MESSAGE, fmt.Sprintf("received %d repositories from GitHub", len(repos)))
+
+		for _, repo := range repos {
+
+			validateRepo(repo)
+
+			if isSuccess := transferRepo(
+				cfg,
+				gh,
+				*repo.Name,
+				*repo.CloneURL,
+				*repo.Description,
+				*repo.Language,
+				*repo.Private); isSuccess {
+
+				countRepo++
+			}
+		}
+
 	}
 
-	log.Printf("\033[34;43;1m%s\033[0m\n",
-		fmt.Sprintf("moved %d repositories from GitHub to GitFlic", count))
+	log.Printf(MESSAGE, fmt.Sprintf("moved %d repositories from GitHub to GitFlic", countRepo))
 
 	switch gistOpt {
 	case "yes":
-		count = gistMulti(cfg, gh)
+		gists, err := gh.GistsList()
+		if err != nil {
+			log.Fatalf(ERROR, err)
+		}
+
+		log.Printf(MESSAGE, fmt.Sprintf("received %d gists from GitHub", len(gists)))
+		
+		for _, gist := range gists {
+			if isSuccess := transferRepo(
+				cfg,
+				gh,
+				*gist.ID,
+				*gist.GitPullURL,
+				*gist.Description,
+				"Markdown",
+				!*gist.Public); isSuccess {
+
+				countGist++
+			}
+		}
+
 	case "single":
-		count = gistSingle(cfg, gh)
+		countGist = gistSingle(cfg, gh)
+
 	case "no":
 		fallthrough
+
 	default:
-		count = 0
+		countGist = 0
 	}
 
-	log.Printf("\033[34;43;1m%s\033[0m\n",
-		fmt.Sprintf("moved %d gists from GitHub to GitFlic", count))
+	log.Printf(MESSAGE, fmt.Sprintf("moved %d gists from GitHub to GitFlic", countGist))
 }

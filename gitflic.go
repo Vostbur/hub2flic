@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/go-git/go-git/v5"
@@ -40,11 +39,11 @@ func NewProject(cfg *Config, name string, description string, language string, p
 }
 
 // check GitFlick project exists
-func (p *Project) Exists(cfg *Config) bool {
+func (p *Project) Exists(cfg *Config) (bool, error) {
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/%s/%s", GITFLIC_API_URL, cfg.GitFlicName, *p.Alias), nil)
 	if err != nil {
-		log.Fatalf("\033[31;1m%s\033[0m\n", err)
+		return false, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -52,18 +51,16 @@ func (p *Project) Exists(cfg *Config) bool {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Fatalf("\033[31;1m%s\033[0m\n", err)
+		return false, err
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode == 200 {
-		log.Printf("\033[34;1m%s\033[0m\n",
-			fmt.Sprintf("GitFlic project '%s' exists", *p.Title))
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 func (p *Project) setupNilOptions() {
@@ -107,12 +104,10 @@ func (p *Project) Create(cfg *Config) error {
 			*p.Title, resp.StatusCode)
 	}
 
-	log.Printf("\033[34;1m%s\033[0m\n",
-		fmt.Sprintf("GitFlic project '%s' is created", *p.Title))
-
 	return nil
 }
 
+// init new repo and commit files
 func (p *Project) InitCommit(pth string) error {
 	path := *p.ClonePath + pth
 
@@ -167,9 +162,6 @@ func (p *Project) Push(cfg *Config, path string) error {
 	if err != nil {
 		return err
 	}
-
-	log.Printf("\033[34;1m%s\033[0m\n",
-		fmt.Sprintf("repository '%s' is pushed", *p.PushURL))
 
 	return nil
 }
